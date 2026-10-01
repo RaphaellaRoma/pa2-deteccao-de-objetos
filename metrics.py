@@ -4,7 +4,8 @@ IDF1: atribuição global de identidades com contagem de quadros espacialmente
 compatíveis (não depende do matching local). IDSW: troca da última identidade
 associada, inclusive depois de lacunas. Fragmentação: matched -> unmatched ->
 matched dentro das observações GT. Ausência de uma linha GT não conta como FN.
-Não implementa ainda o protocolo de regiões ignoradas do MOTChallenge.
+Filtragem MOT é feita em mot_data.py antes da avaliação, nunca na inferência.
+Não é uma implementação integral do protocolo oficial MOTChallenge.
 """
 import numpy as np
 from scipy.optimize import linear_sum_assignment
