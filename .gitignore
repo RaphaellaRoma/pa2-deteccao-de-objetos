@@ -5,3 +5,4 @@ tmp/
 data/
 outputs/
 checkpoints/
+.ipynb_checkpoints/
