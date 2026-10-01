@@ -1,0 +1,17 @@
+{
+  "protocol": "pa2-pedestrians-v1",
+  "public_detector": "FRCNN",
+  "split": {
+    "train": ["MOT17-04", "MOT17-05", "MOT17-10", "MOT17-11"],
+    "validation": ["MOT17-02", "MOT17-09", "MOT17-13"]
+  },
+  "score_threshold": 0.5,
+  "association_iou": 0.3,
+  "max_age": 2,
+  "evaluation_iou": 0.5,
+  "ignore_iou": 0.5,
+  "torchvision_model": "fasterrcnn_resnet50_fpn",
+  "torchvision_weights": "COCO_V1",
+  "cache_score_threshold": 0.05,
+  "device": "auto"
+}
