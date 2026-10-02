@@ -12,8 +12,8 @@ from baseline import IoUTracker
 from metrics import evaluate
 
 
-def run(scene, seed):
-    det = corrupt_detections(scene.gt, seed=seed)
+def run(scene, seed, **detector_parameters):
+    det = corrupt_detections(scene.gt, seed=seed, **detector_parameters)
     tracker = IoUTracker()
     predictions = []
     for f in range(1, len(scene.frames)+1):
@@ -22,11 +22,9 @@ def run(scene, seed):
     return evaluate(scene.gt[scene.gt[:, 6] > 0, :6], predictions)
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output', default='outputs/parte0')
-    args = parser.parse_args()
-    out = Path(args.output)
+def run_experiments(output='outputs/parte0'):
+    """Gera metricas e figuras identicas para CLI e notebook."""
+    out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
     easy = generate()
     easy_metrics = run(easy, 0)
@@ -67,7 +65,15 @@ def main():
     result = dict(easy=easy_metrics, fully_hidden_frames=hidden.astype(int).tolist(), experiments=experiments)
     (out/'results.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(easy_metrics, indent=2))
-    print(f'Artefatos: {out.resolve()}')
+    print(f'Artefatos: {out.as_posix()}')
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', default='outputs/parte0')
+    args = parser.parse_args()
+    run_experiments(args.output)
 
 
 if __name__ == '__main__':

@@ -3,6 +3,19 @@
 Rastreamento próprio de pedestres com MOT17 e detector pré-treinado torchvision.
 Associação, gestão de tracks, NMS e métricas implementados no repositório.
 
+## Notebook da apresentação
+
+**[experimentos_pa2.ipynb](experimentos_pa2.ipynb)** é o notebook do trabalho,
+organizado das Partes 0 a 5, com métricas, figuras e interpretação dos
+resultados. A Parte 0 é uma referência breve; as seções 2–4 aguardam integração.
+O código pesado permanece nos módulos `.py`. As saídas estão
+salvas; para reproduzir, executar todas as células com os dados e caches
+preparados. Inferência do detector e benchmark ficam opcionais na seção da
+Parte 1. A Parte 5 ainda aguarda comparação com o modelo temporal final.
+
+Os notebooks individuais permanecem como versões por parte; use o notebook
+unificado para a apresentação. Ele não substitui `inferencia.ipynb`.
+
 ## Estado do trabalho
 
 - Parte 0 implementada: gerador, oclusão real, detector simulado e testes.
@@ -37,6 +50,13 @@ No Colab, clonar o repositório, instalar dependências e abrir o mesmo notebook
 na raiz. Os módulos continuam em arquivos Python, sem duplicação nas células.
 
 ## Parte 0
+
+**`parte0.ipynb`** reúne a apresentação da Parte 0: contrato do gerador,
+oclusão real com figura e animação, detector simulado, casos manuais das métricas,
+piso fácil, curvas de dificuldade em três seeds e testes automatizados.
+As saídas estão salvas no notebook. Executar todas as células regenera os
+artefatos; o código de experimentos permanece em `run_synthetic.py`, função
+`run_experiments`, também chamada pelo comando abaixo.
 
 ```powershell
 python run_synthetic.py
