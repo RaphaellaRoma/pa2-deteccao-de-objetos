@@ -6,11 +6,12 @@ Associação, gestão de tracks, NMS e métricas implementados no repositório.
 ## Estado do trabalho
 
 - Parte 0 implementada: gerador, oclusão real, detector simulado e testes.
-- Parte 1: pipeline, notebook e avaliação pública nas sete sequências executados.
-  Detector pré-treinado testado em três quadros de cada vídeo de validação.
-  Comparação final exige terminar a inferência dos 1.875 quadros de validação.
+- Parte 1 executada: avaliação pública nas sete sequências e comparação com
+  torchvision nos 1.875 quadros completos de validação. Resultados e figuras
+  registrados no notebook, com `complete_part1=True`.
 - Partes 2–4 (modelo temporal, treino, ablação e memória) ainda pendentes.
-- Parte 5: entrada de detecções alternativas pronta; estresse ainda pendente.
+- Parte 5: gerador de estresse e avaliação do baseline implementados; comparação
+  com o modelo temporal final ainda pendente.
 - Checkpoint temporal e `inferencia.ipynb` ainda pendentes. `parte1.ipynb` é o
   notebook de experimentos do baseline e não substitui a inferência final.
 
@@ -101,9 +102,10 @@ O segundo comando é o comando único de avaliação depois de preparar os cache
 Não há treino de detector nessa parte; o comando de treino temporal será
 adicionado quando o modelo temporal estiver implementado.
 
-**`parte1.ipynb`** chama os mesmos módulos. Download, benchmark e inferência
-pesada estão desligados por padrão: alterar `RUN_DOWNLOAD`, `RUN_BENCHMARK` e
-`RUN_DETECT` na primeira célula. Cache parcial não é apresentado como comparação
+**`parte1.ipynb`** chama os mesmos módulos. A versão executada habilita benchmark
+e inferência pela primeira célula (`PA2_RUN_BENCHMARK` e `PA2_RUN_DETECT`). Para
+apenas avaliar caches, defina essas variáveis como `"0"` nessa célula. Download
+continua opcional via `RUN_DOWNLOAD`. Cache parcial não é apresentado como comparação
 completa. Caches completos podem ser avaliados sem GPU.
 
 Detector: Faster R-CNN ResNet-50 FPN, COCO_V1, classe `person`, sem fine-tuning.
@@ -164,6 +166,37 @@ Benchmark executado em CPU/MOT17-09: cerca de 3,36 s/quadro, projeção de 105
 minutos para 1.875 quadros, pico do processo de aproximadamente 1.053 MB.
 São medidas daquela execução, não garantia para outro hardware ou vídeo.
 
+## Comparação completa da Parte 1
+
+Valores da execução CUDA preservada em `parte1.ipynb`, com os mesmos limiares
+da tabela anterior e todas as sequências de validação completas:
+
+| Sequência | Fonte | AP50 | mAP 0,50:0,95 | IDF1 | IDs previstos / GT |
+| --- | --- | ---: | ---: | ---: | ---: |
+| MOT17-02 | Público | 0,3363 | 0,2659 | 0,3632 | 135 / 62 |
+| MOT17-02 | Torchvision | 0,4166 | 0,2338 | 0,3093 | 704 / 62 |
+| MOT17-09 | Público | 0,5544 | 0,4638 | 0,5515 | 50 / 26 |
+| MOT17-09 | Torchvision | 0,7160 | 0,4319 | 0,4511 | 326 / 26 |
+| MOT17-13 | Público | 0,5607 | 0,3853 | 0,4640 | 518 / 110 |
+| MOT17-13 | Torchvision | 0,5432 | 0,2628 | 0,3337 | 1249 / 110 |
+
+Na MOT17-09, AP50 cresce 0,1616, mas IDF1 cai 0,1004 e a contagem sobe
+de 50 para 326 IDs para 26 pessoas. Na MOT17-02 ocorre a mesma direção no
+AP50 e no IDF1. Caixas melhores no limiar IoU 0,5 não asseguram identidade
+consistente com associação pela última caixa observada. O mAP cai nas três
+sequências; o ganho de AP50 não representa melhoria em todos os limiares.
+
+O público obtém maior IDF1 nas três sequências. Mantemos o FRCNN público já
+fixado no contrato para comparar baseline e modelo temporal com entradas
+iguais. A MOT17-13 tem menor densidade que a 02, mas gera mais identidades
+excedentes. Movimento, oclusão e variação das caixas são hipóteses a investigar
+nas figuras; estas métricas agregadas não isolam suas causas.
+
+Benchmark CUDA: 0,3802 s/quadro, projeção de 11,88 minutos para 1.875 quadros,
+pico de 671,3 MB na GPU e 1.649,9 MB no processo. A projeção não é o tempo
+medido de uma execução completa. A execução local em CPU também terminou;
+pequenas diferenças numéricas não mudaram a ordenação de IDF1 entre fontes.
+
 ## Regras e integração
 
 Contrato em **[docs/CONTRATO.md](docs/CONTRATO.md)** e `configs/parte1.json`.
@@ -188,6 +221,58 @@ python parte1.py evaluate --sources external --split validation --detections-dir
 
 Depuração: `--max-frames 3` e cache/saída separados. Resultados parciais não
 substituem vídeos completos.
+
+## Parte 5: qualidade do detector
+
+```powershell
+python parte5.py
+```
+
+Usa as detecções públicas FRCNN aceitas pelo corte 0,5, três vídeos completos
+de validação e seeds 0/1/2. Inclui controle original e três intensidades em
+`configs/parte5.json`: descarte de 10/30/50%, ruído relativo de 3/8/15% e
+Poisson de 0,5/1,5/3 falsos positivos por quadro. As intensidades combinam as
+três alterações; não isolam o efeito individual de cada uma.
+
+O ruído gaussiano desloca centros em unidades de largura/altura e altera
+tamanhos multiplicativamente (log-normal). Caixas corrompidas ficam dentro
+da imagem. FP têm posição uniforme e tamanhos/scores amostrados das detecções
+originais. FP significa injeção sem correspondência conhecida: por acaso pode
+sobrepor uma pessoa real. Scores originais não mudam. O gerador não recebe GT.
+
+Saídas em `outputs/parte5/`: `detections/<nivel>/seed-<seed>/<sequencia>.csv`,
+previsões MOT, `metrics.csv`, `results.json` com hashes e `estresse.png`.
+O gráfico mostra média com peso igual por sequência; barras representam o
+desvio padrão das médias entre seeds, não intervalo de confiança.
+`parte5.ipynb` apresenta o experimento sem duplicar funções.
+
+Para a Pessoa 2: executar o checkpoint final, sem retreino, sobre cada CSV
+gerado, incluindo o controle original. Exportar MOT bruto de dez colunas em
+`<pasta>/<nivel>/seed-<seed>/<MOT17-XX>.txt`, preservando duração e quadros vazios.
+Não usar GT durante inferência. Avaliar ambos com:
+
+```powershell
+python parte5.py --temporal-predictions outputs/temporal_stress
+```
+
+Esse comando regenera as mesmas entradas determinísticas. O modelo temporal
+deve consumir exatamente esses arquivos; hashes permitem conferir as entradas.
+Somente a comparação com o modelo final habilita `complete_part5=True`.
+Até lá, os resultados descrevem apenas a robustez do baseline.
+
+Baseline executado em 36 avaliações completas (três sequências, três seeds,
+controle e três intensidades). Médias com peso igual por sequência:
+
+| Intensidade | mAP 0,50:0,95 | IDF1 |
+| --- | ---: | ---: |
+| Original | 0,3717 | 0,4595 |
+| Leve | 0,2764 | 0,3784 |
+| Médio | 0,1165 | 0,1845 |
+| Forte | 0,0256 | 0,0530 |
+
+O baseline perde aproximadamente 88,5% do IDF1 original na intensidade forte.
+Esse resultado estabelece a referência; ainda não informa se a recorrência
+absorve ou amplifica os erros do detector.
 
 ## Testes e arquivos
 

@@ -1,0 +1,8 @@
+{
+  "seeds": [0, 1, 2],
+  "levels": {
+    "leve": {"drop_probability": 0.1, "box_noise_fraction": 0.03, "false_positives_per_frame": 0.5},
+    "medio": {"drop_probability": 0.3, "box_noise_fraction": 0.08, "false_positives_per_frame": 1.5},
+    "forte": {"drop_probability": 0.5, "box_noise_fraction": 0.15, "false_positives_per_frame": 3.0}
+  }
+}
