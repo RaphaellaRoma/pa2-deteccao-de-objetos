@@ -7,14 +7,16 @@ Associação, gestão de tracks, NMS e métricas implementados no repositório.
 
 **[experimentos_pa2.ipynb](experimentos_pa2.ipynb)** é o notebook do trabalho,
 organizado das Partes 0 a 5, com métricas, figuras e interpretação dos
-resultados. A Parte 0 é uma referência breve; as seções 2–4 aguardam integração.
+resultados. A Parte 0 é uma referência breve; as seções 2–4 mostram os resultados
+do experimento completo em **[trabalhop2.ipynb](trabalhop2.ipynb)**.
 O código pesado permanece nos módulos `.py`. As saídas estão
 salvas; para reproduzir, executar todas as células com os dados e caches
 preparados. Inferência do detector e benchmark ficam opcionais na seção da
-Parte 1. A Parte 5 ainda aguarda comparação com o modelo temporal final.
+Parte 1. A Parte 5 compara o baseline e o checkpoint temporal congelado.
 
 Os notebooks individuais permanecem como versões por parte; use o notebook
-unificado para a apresentação. Ele não substitui `inferencia.ipynb`.
+unificado para a apresentação. **[inferencia.ipynb](inferencia.ipynb)** recebe
+uma sequência MOT17 e produz MP4 com IDs e contagem única.
 
 ## Estado do trabalho
 
@@ -22,11 +24,17 @@ unificado para a apresentação. Ele não substitui `inferencia.ipynb`.
 - Parte 1 executada: avaliação pública nas sete sequências e comparação com
   torchvision nos 1.875 quadros completos de validação. Resultados e figuras
   registrados no notebook, com `complete_part1=True`.
-- Partes 2–4 (modelo temporal, treino, ablação e memória) ainda pendentes.
-- Parte 5: gerador de estresse e avaliação do baseline implementados; comparação
-  com o modelo temporal final ainda pendente.
-- Checkpoint temporal e `inferencia.ipynb` ainda pendentes. `parte1.ipynb` é o
-  notebook de experimentos do baseline e não substitui a inferência final.
+- Parte 2: GRU causal treinada em trajetórias MOT17 04/05/10/11; comparação com o
+  baseline nas sequências 02/09/13 usando as mesmas detecções públicas.
+- Parte 3: ablação sintética RNN/GRU/LSTM, janelas 4/8/16/32 e três seeds no
+  notebook de experimentos; checkpoint RNN MOT17 para horizonte analítico.
+- Parte 4: gradientes dos modelos treinados, sobrevivência por oclusão GT, três
+  faixas de falhas reais e intervenção `max_age=2` para 8.
+- Parte 5: três intensidades e três seeds, sem retreino; mAP e IDF1 lado a lado
+  para baseline e modelo temporal em 02/09/13.
+- Checkpoints em `checkpoints/temporal_mot17.pt` e
+  `checkpoints/temporal_rnn_mot17.pt`; `inferencia.ipynb` e `render_video.py`
+  produzem vídeo e contagem.
 
 ## Ambiente
 
@@ -242,10 +250,53 @@ python parte1.py evaluate --sources external --split validation --detections-dir
 Depuração: `--max-frames 3` e cache/saída separados. Resultados parciais não
 substituem vídeos completos.
 
+## Partes 2–4: movimento, ablação e memória
+
+Treino e comparação da GRU na trilha A, com split por vídeo físico e entrada
+FRCNN pública congelada:
+
+```powershell
+python run_temporal.py all --device auto
+python run_temporal.py train --cell RNN --checkpoint checkpoints/temporal_rnn_mot17.pt
+python temporal_analysis.py --device auto
+```
+
+O tracker prevê a caixa seguinte, associa por Hungarian/IoU e mantém o estado
+recorrente durante lacunas. Ele não recebe GT na inferência. O modelo prevê
+deslocamento residual sobre a caixa corrente, treinado com smooth L1 em janelas
+contíguas de GT dos vídeos 04/05/10/11. As previsões são avaliadas nos vídeos
+02/09/13 completos. O baseline tem `max_age=2`; o modelo final usa 8. A análise
+da Parte 4 também compara 2 e 8 no mesmo checkpoint.
+
+| Sequência | IDF1 baseline | IDF1 GRU | IDs baseline / GRU |
+| --- | ---: | ---: | ---: |
+| MOT17-02 | 0,3632 | 0,3764 | 135 / 123 |
+| MOT17-09 | 0,5515 | 0,5043 | 50 / 44 |
+| MOT17-13 | 0,4640 | 0,4592 | 518 / 457 |
+
+O efeito é misto: a GRU reduz o número de IDs criados nas três sequências,
+mas só aumenta IDF1 na 02. A análise contém 222 episódios GT de visibilidade
+zero; só 21 tinham ID associado imediatamente antes, denominador da taxa de
+sobrevivência. Com `max_age=2`, 5/21 mantiveram o ID; com 8, 6/21. A extensão
+do prazo melhora a 02, porém diminui IDF1 na 09 e na 13. Três faixas reais de
+troca, curvas de gradiente RNN/GRU e o gráfico por duração estão em
+`outputs/temporal_analysis/`. A ablação RNN/GRU/LSTM de três seeds e quatro
+janelas permanece no fluxo original de `trabalhop2.ipynb`, com tabela exportada
+para `outputs/ablation/idf1.csv` quando executada na GPU.
+
+Inferência de uma sequência completa com vídeo e contagem única:
+
+```powershell
+python render_video.py data/MOT17/train/MOT17-09-FRCNN --checkpoint checkpoints/temporal_mot17.pt --output outputs/inferencia/MOT17-09.mp4 --device auto
+```
+
+O mesmo fluxo está em `inferencia.ipynb`. A contagem corresponde a IDs
+previstos únicos e pode exceder o número de pessoas quando ocorre fragmentação.
+
 ## Parte 5: qualidade do detector
 
 ```powershell
-python parte5.py
+python temporal_stress.py --device auto
 ```
 
 Usa as detecções públicas FRCNN aceitas pelo corte 0,5, três vídeos completos
@@ -266,33 +317,24 @@ O gráfico mostra média com peso igual por sequência; barras representam o
 desvio padrão das médias entre seeds, não intervalo de confiança.
 `parte5.ipynb` apresenta o experimento sem duplicar funções.
 
-Para a Pessoa 2: executar o checkpoint final, sem retreino, sobre cada CSV
-gerado, incluindo o controle original. Exportar MOT bruto de dez colunas em
-`<pasta>/<nivel>/seed-<seed>/<MOT17-XX>.txt`, preservando duração e quadros vazios.
-Não usar GT durante inferência. Avaliar ambos com:
-
-```powershell
-python parte5.py --temporal-predictions outputs/temporal_stress
-```
-
-Esse comando regenera as mesmas entradas determinísticas. O modelo temporal
-deve consumir exatamente esses arquivos; hashes permitem conferir as entradas.
-Somente a comparação com o modelo final habilita `complete_part5=True`.
-Até lá, os resultados descrevem apenas a robustez do baseline.
+O comando gera as entradas determinísticas, executa o checkpoint congelado
+sobre todos os CSVs e avalia ambos os rastreadores (`complete_part5=True`).
+Hashes permitem conferir as entradas. Não há retreino nem uso de GT na
+inferência.
 
 Baseline executado em 36 avaliações completas (três sequências, três seeds,
 controle e três intensidades). Médias com peso igual por sequência:
 
-| Intensidade | mAP 0,50:0,95 | IDF1 |
-| --- | ---: | ---: |
-| Original | 0,3717 | 0,4595 |
-| Leve | 0,2764 | 0,3784 |
-| Médio | 0,1165 | 0,1845 |
-| Forte | 0,0256 | 0,0530 |
+| Intensidade | mAP 0,50:0,95 | IDF1 baseline | IDF1 GRU |
+| --- | ---: | ---: | ---: |
+| Original | 0,3717 | 0,4595 | 0,4466 |
+| Leve | 0,2764 | 0,3784 | 0,3820 |
+| Médio | 0,1165 | 0,1845 | 0,2499 |
+| Forte | 0,0256 | 0,0530 | 0,0750 |
 
-O baseline perde aproximadamente 88,5% do IDF1 original na intensidade forte.
-Esse resultado estabelece a referência; ainda não informa se a recorrência
-absorve ou amplifica os erros do detector.
+Médias com peso igual para as três sequências e três seeds. A GRU melhora o
+IDF1 médio nas três intensidades corrompidas, mas fica abaixo do baseline no
+controle original. O mAP é o mesmo para ambos porque recebem as mesmas caixas.
 
 ## Testes e arquivos
 
@@ -309,6 +351,7 @@ Parte 0: `synthetic.py`, `geometry.py`, `baseline.py`, `metrics.py`, `run_synthe
 Parte 1: `mot_data.py`, `detection_metrics.py`, `detector.py`, `parte1.py`,
 `visualization.py`, `download_mot17.py`, `parte1.ipynb`.
 
-Dados, pesos, caches, vídeos, resultados volumosos, PDF e conversas não são
-publicados. O `AI_LOG.md` técnico exigido na entrega será revisado para descrever
-uso de IA sem histórico de conversas ou informações pessoais.
+Dados MOT17, caches, vídeos, resultados volumosos, PDF e conversas não são
+publicados. Os dois checkpoints pequenos e reproduzíveis são incluídos. O
+`AI_LOG.md` local deve ser revisado pelos integrantes antes da entrega final;
+não contém histórico de conversas.

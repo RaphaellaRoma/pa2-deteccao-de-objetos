@@ -4,5 +4,7 @@ __pycache__/
 tmp/
 data/
 outputs/
-checkpoints/
+checkpoints/*
+!checkpoints/temporal_mot17.pt
+!checkpoints/temporal_rnn_mot17.pt
 .ipynb_checkpoints/
